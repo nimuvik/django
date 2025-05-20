@@ -1,0 +1,17 @@
+{% extends "blog/base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+    <h1>{{ post.title }}</h1>
+    <p class="date">
+        Опубликовано {{ post.publish }} автором {{ post.author }}
+    </p>
+    <div class="categories">
+        Категории:
+        {% for category in post.categories.all %}
+            {{ category.name }}{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+    </div>
+    {{ post.body|linebreaks }}
+{% endblock %}
