@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from .models import *
 
 
@@ -6,7 +7,9 @@ class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     raw_id_fields = ['product']
-    readonly_fields = ['price']
+    # убираем readonly, чтобы цена сохранялась
+    # можно вернуть, если хочешь, чтобы поле было только для чтения
+    # readonly_fields = ['price']
 
 
 class PaymentInline(admin.StackedInline):
@@ -15,13 +18,12 @@ class PaymentInline(admin.StackedInline):
     readonly_fields = ['payment_date']
 
 
-@admin.register(Product) # товары
+@admin.register(Product)  # товары
 class ProductAdmin(admin.ModelAdmin):
     list_display = ('name', 'brand', 'price', 'stock', 'category', 'expiry_status')
     list_filter = ('category', 'brand')
     search_fields = ('name', 'description', 'brand')
     list_display_links = ('name', 'brand')
-    date_hierarchy = None
 
     @admin.display(description="Статус срока")
     def expiry_status(self, obj):
@@ -30,7 +32,7 @@ class ProductAdmin(admin.ModelAdmin):
         return "Нет данных"
 
 
-@admin.register(Order) # заказы
+@admin.register(Order)  # заказы
 class OrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'total_price', 'status', 'created_at', 'payment_status')
     list_filter = ('status', 'created_at', 'delivery_method')
@@ -47,7 +49,18 @@ class OrderAdmin(admin.ModelAdmin):
             return "Не оплачен"
         return ", ".join([p.get_status_display() for p in payments])
 
-@admin.register(Review) # отзывы
+    # вот добавленный метод, который автоматически подставляет цену
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, OrderItem):
+                if not instance.price:
+                    instance.price = instance.product.price
+            instance.save()
+        formset.save_m2m()
+
+
+@admin.register(Review)  # отзывы
 class ReviewAdmin(admin.ModelAdmin):
     list_display = ('product', 'user', 'rating', 'created_at', 'short_comment')
     list_filter = ('rating', 'created_at')
@@ -59,7 +72,7 @@ class ReviewAdmin(admin.ModelAdmin):
         return obj.comment[:50] + '...' if len(obj.comment) > 50 else obj.comment
 
 
-@admin.register(Category) # категории
+@admin.register(Category)  # категории
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'product_count')
 
@@ -68,7 +81,7 @@ class CategoryAdmin(admin.ModelAdmin):
         return obj.product_set.count()
 
 
-@admin.register(Favorite) # избранное
+@admin.register(Favorite)  # избранное
 class FavoriteAdmin(admin.ModelAdmin):
     list_display = ('user', 'product', 'created_at')
     list_filter = ('created_at',)
@@ -76,6 +89,7 @@ class FavoriteAdmin(admin.ModelAdmin):
     raw_id_fields = ('user', 'product')
 
 
+# обычная регистрация остальных моделей
 admin.site.register(DeliveryMethod)
 admin.site.register(Payment)
 admin.site.register(Promotion)
